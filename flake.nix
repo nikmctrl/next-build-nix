@@ -7,8 +7,6 @@
   # Import napalm
   inputs.napalm.url = "github:nix-community/napalm";
 
-  nixConfig.sandbox = "relaxed";
-
   outputs = { self, nixpkgs, napalm }:
     let
       # Generate a user-friendly version number.
@@ -32,23 +30,14 @@
           ];
         });
 
-      system = "aarch64-darwin";
-      pkgs = nixpkgsFor.${system};
-
     in
     {
       # A Nixpkgs overlay.
       overlays = {
         default = final: prev: {
           # Example package
-          next-app = final.napalm.buildPackage ./. { 
-            buildPhase = ''
-              npm run postinstall
-
-              mkdir -p $out/bin
-              cp -r ./dist $out/bin/next-app
-              chmod +x $out/bin/next-app
-            '';
+          next-app = final.napalm.buildPackage ./my-app { 
+            
           };
         };
       };
