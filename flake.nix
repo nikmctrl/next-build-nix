@@ -10,7 +10,7 @@
   outputs = { self, nixpkgs, nix-filter, flake-utils }:
   let 
      pkgs = nixpkgs.legacyPackages.aarch64-darwin;
-     nodejs = pkgs.nodejs-18_x;
+     nodejs = pkgs.nodejs;
   in
   {
     packages.aarch64-darwin.node_modules = pkgs.stdenv.mkDerivation {
@@ -37,7 +37,8 @@
 
       # Pull all the dependencies
       buildPhase = ''
-        ${nodejs}/bin/npm ci
+        ${nodejs}/bin/npm ping
+        echo "ping successful"
       '';
 
       # NOTE[z]: The folder *must* be called "node_modules". Don't ask me why.
