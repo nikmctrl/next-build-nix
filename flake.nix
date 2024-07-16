@@ -7,6 +7,8 @@
   # Import napalm
   inputs.napalm.url = "github:nix-community/napalm";
 
+  nixConfig.sandbox = "relaxed";
+
   outputs = { self, nixpkgs, napalm }:
     let
       # Generate a user-friendly version number.
@@ -30,24 +32,51 @@
           ];
         });
 
+      system = "aarch64-darwin";
+      pkgs = nixpkgsFor.${system};
+
     in
     {
       # A Nixpkgs overlay.
       overlays = {
         default = final: prev: {
           # Example package
-          next = final.napalm.buildPackage ./. { };
+          next-app = final.napalm.buildPackage ./. { 
+            __noChroot = true;
+          };
         };
       };
 
       # Provide your packages for selected system types.
       packages = forAllSystems (system: {
-        inherit (nixpkgsFor.${system}) next;
+        inherit (nixpkgsFor.${system}) next-app;
 
         # The default package for 'nix build'. This makes sense if the
         # flake provides only one package or there is a clear "main"
         # package.
-        default = self.packages.${system}.next;
+        default = pkgs.stdenv.mkDerivation {
+          name = "next-build-nix";
+          src = ./.;
+          buildInputs = [ pkgs.next-app pkgs.nodejs ];
+
+          __noChroot = true;
+
+          buildPhase = ''
+            cp -r ${pkgs.next-app}/_napalm-install/ $out
+            cd $out
+            mkdir .next
+            ${pkgs.nodejs}/bin/npm run build
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
+            cp -r .next/standalone $out/bin/next-build-nix-app
+
+            echo "#!${pkgs.nodejs}/bin/node" > $out/bin/next-build-nix
+            echo "require('$out/bin/next-build-nix-app/server/server.js')" >> $out/bin/next-build-nix
+            chmod +x $out/bin/next-build-nix
+          '';
+        };
       });
     };
 }
