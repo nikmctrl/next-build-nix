@@ -1,15 +1,53 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  description = "An example of Napalm with flakes";
+
+  # Nixpkgs / NixOS version to use.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  # Import napalm
   inputs.napalm.url = "github:nix-community/napalm";
 
-  # NOTE: This is optional, but is how to configure napalm's env
-  inputs.napalm.inputs.nixpkgs.follows = "nixpkgs";
+  outputs = { self, nixpkgs, napalm }:
+    let
+      # Generate a user-friendly version number.
+      version = builtins.substring 0 8 self.lastModifiedDate;
 
-  outputs = { self, napalm }: 
-  let
-    system = "aarch64-darwin";
-  in {
-    # Assuming the flake is in the same directory as package-lock.json
-    packages."${system}".next-app = napalm.legacyPackages."${system}".buildPackage ./. { };
-  };
+      # System types to support.
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" "i686-linux" "x86_64-darwin" "aarch64-darwin" ];
+
+      # Helper function to generate an attrset '{ x86_64-linux = f "x86_64-linux"; ... }'.
+      forAllSystems = f:
+        nixpkgs.lib.genAttrs supportedSystems (system: f system);
+
+      # Nixpkgs instantiated for supported system types.
+      nixpkgsFor = forAllSystems (system:
+        import nixpkgs {
+          inherit system;
+          # Add napalm to you overlay's list
+          overlays = [
+            self.overlays.default
+            napalm.overlays.default
+          ];
+        });
+
+    in
+    {
+      # A Nixpkgs overlay.
+      overlays = {
+        default = final: prev: {
+          # Example package
+          next = final.napalm.buildPackage ./. { };
+        };
+      };
+
+      # Provide your packages for selected system types.
+      packages = forAllSystems (system: {
+        inherit (nixpkgsFor.${system}) next;
+
+        # The default package for 'nix build'. This makes sense if the
+        # flake provides only one package or there is a clear "main"
+        # package.
+        default = self.packages.${system}.next;
+      });
+    };
 }
